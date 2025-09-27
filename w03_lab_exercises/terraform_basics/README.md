@@ -1,6 +1,6 @@
-# Terraform Basics Tutorial
+# COMP09120 - Cloud Services & Architectures (Week 03)
 
-Welcome to your first Terraform lab! This tutorial will guide you through the fundamentals of Infrastructure as Code (IaC) using Terraform to create AWS resources.
+This guide will walk you through the fundamentals of Infrastructure as Code (IaC) using Terraform to provision AWS resources. We'll use the existing configuration files in this directory to learn core Terraform concepts and commands.
 
 ## What is Terraform?
 
@@ -8,24 +8,19 @@ Terraform is an open-source tool that allows you to define, provision, and manag
 
 ## Prerequisites
 
-Before starting, make sure you have:
+Before starting, ensure you have completed previous steps of the lab session on Aula:
+- Terraform installed (check with `terraform version`)
+- AWS credentials configured in `~/.aws/credentials`
+- Access to an AWS account
 
-1. **Terraform installed** - Check with `terraform version`
-2. **AWS credentials configured** - Your AWS academic account credentials should be set up in `~/.aws/credentials`
+## Step 2: Terraform providers
 
-## Lab Overview
+Terraform implements a modular approach in its application architecture. The Terraform binary you have installed is the core module required to perform core Terraform functions. Any operation that involves invoking cloud provider APIs requires additional provider modules.
 
-In this lab, you will:
-- Learn about Terraform providers
-- Understand how to define AWS resources
-- Practice essential Terraform commands
-- Create and manage an EC2 instance
+In our case, Terraform needs to instantiate the AWS provider module to work with AWS services. Let's examine our provider configuration.
 
-## Step 1: Understanding the Provider Configuration
+Open the `provider.tf` file and examine its contents:
 
-Open the `provider.tf` file and examine it carefully. This file contains three important sections:
-
-### 1.1 The `terraform` Block
 ```hcl
 terraform {
   required_version = ">= 1.5.0"
@@ -36,28 +31,12 @@ terraform {
     }
   }
 }
-```
 
-**What this does:**
-- Sets the minimum Terraform version required
-- Declares that we need the AWS provider
-- Specifies which version of the AWS provider to use
-
-### 1.2 The `provider` Block
-```hcl
 provider "aws" {
   profile = "default"
   region  = var.aws_region
 }
-```
 
-**What this does:**
-- Configures how Terraform connects to AWS
-- Uses the "default" profile from your AWS credentials file
-- Sets the AWS region where resources will be created
-
-### 1.3 The `variable` Block
-```hcl
 variable "aws_region" {
   description = "AWS region to deploy into"
   type        = string
@@ -65,201 +44,275 @@ variable "aws_region" {
 }
 ```
 
-**What this does:**
-- Defines a variable to make the configuration flexible
-- Sets a default AWS region
-- Can be overridden when running Terraform commands
+**Understanding the configuration:**
 
-## Step 2: Understanding Resource Definition
+- The `terraform` block specifies the minimum Terraform version and required providers
+- The `required_providers` block tells Terraform to download the AWS provider from HashiCorp's registry
+- The version constraint `~> 5.0` means any version >= 5.0.0 and < 6.0.0
+- The `provider "aws"` block configures how Terraform connects to AWS using your credentials profile
+- The `variable` block makes the AWS region configurable
 
-Open the `main.tf` file and look at the EC2 instance resource:
-
-```hcl
-resource "aws_instance" "my_vm" {
-  ami           = data.aws_ami.ubuntu_2204.id
-  instance_type = "t2.micro"
-  # ... more configuration
-}
-```
-
-**Key concepts:**
-- `resource` - Tells Terraform this is a resource to create
-- `"aws_instance"` - The resource type (an EC2 instance)
-- `"my_vm"` - The local name for this resource (you choose this)
-- Inside the block are the resource's properties
-
-## Step 3: Essential Terraform Commands
-
-Now let's learn the core Terraform workflow commands. Run these commands in order:
-
-### 3.1 Initialize Terraform
+Now run the following command to initialize your Terraform project:
 
 ```bash
 terraform init
 ```
 
-**What this does:**
-- Downloads the AWS provider plugin
-- Sets up the working directory
-- Creates a `.terraform` directory with provider files
+You should see output similar to:
+```
+Initializing the backend...
+Initializing provider plugins...
+- Finding hashicorp/aws versions matching "~> 5.0"...
+- Installing hashicorp/aws v5.x.x...
+- Installed hashicorp/aws v5.x.x (signed by HashiCorp)
 
-**Expected output:**
-- You should see "Terraform has been successfully initialized!"
+Terraform has been successfully initialized!
+```
 
-### 3.2 Format Your Code
+This command downloads the AWS provider plugin and creates a `.terraform` directory with the provider binaries.
+
+## Step 3: Terraform resources
+
+Now let's examine how to define AWS resources. Open the `main.tf` file to see our resource declarations.
+
+The main components in our configuration are:
+
+### Data Sources
+Data sources allow you to fetch information about existing AWS resources:
+
+```hcl
+data "aws_vpc" "default" {
+  default = true
+}
+
+data "aws_ami" "ubuntu_2204" {
+  most_recent = true
+  owners      = ["099720109477"] # Canonical
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
+  }
+}
+```
+
+### Security Group Resource
+```hcl
+resource "aws_security_group" "eic_ssh" {
+  name        = "allow-ssh-for-eic"
+  description = "Allow SSH (22) for EC2 Instance Connect"
+  vpc_id      = data.aws_vpc.default.id
+  # ... ingress and egress rules
+}
+```
+
+### EC2 Instance Resource
+```hcl
+resource "aws_instance" "my_vm" {
+  ami           = data.aws_ami.ubuntu_2204.id
+  instance_type = "t2.micro"
+  subnet_id     = data.aws_subnets.default.ids[0]
+  vpc_security_group_ids = [aws_security_group.eic_ssh.id]
+  # ... additional configuration
+}
+```
+
+**Key concepts:**
+- `resource` blocks define infrastructure components to be created
+- `"aws_instance"` is the resource type (an EC2 instance)
+- `"my_vm"` is the local identifier for this resource
+- Resource attributes define the properties of the resource
+- References like `data.aws_ami.ubuntu_2204.id` create dependencies between resources
+
+## Step 4: Terraform CLI commands
+
+We have created the Terraform code to provision our AWS resources, but we haven't actually provisioned them yet. Let's explore the most important Terraform CLI commands that help us understand the resource lifecycle managed by Terraform.
+
+### 1. Format (fmt)
+
+Proper code formatting improves readability and maintainability. The `terraform fmt` command automatically formats your Terraform code.
 
 ```bash
 terraform fmt
 ```
 
 **What this does:**
-- Automatically formats your `.tf` files
-- Ensures consistent indentation and spacing
-- Good practice to run before committing code
+- Formats all `.tf` files in the current directory
+- Standardizes indentation and spacing
+- Outputs the names of files that were reformatted
 
-### 3.3 Validate Your Configuration
+Run this command now - you should see output showing which files were formatted.
+
+### 2. Validate
+
+Before proceeding, let's validate our configuration:
 
 ```bash
 terraform validate
 ```
 
 **What this does:**
-- Checks your configuration files for syntax errors
-- Ensures resource references are valid
-- Doesn't check if resources can actually be created
+- Checks configuration files for syntax errors
+- Validates resource references and required arguments
+- Confirms the configuration is syntactically correct
 
-### 3.4 Plan Your Changes
+You should see "Success! The configuration is valid."
+
+### 3. Plan
+
+The plan command shows you what Terraform will do before actually doing it:
 
 ```bash
 terraform plan
 ```
 
 **What this does:**
-- Shows you what Terraform will create, modify, or destroy
-- Like a "preview" before making actual changes
-- No resources are created yet!
+- Compares your desired state (configuration) with the current state
+- Shows what resources will be created, modified, or destroyed
+- Provides a preview without making any changes
 
-**What to look for:**
+**Understanding the output:**
 - Resources marked with `+` will be created
-- Resources marked with `-` will be destroyed
+- Resources marked with `-` will be destroyed  
 - Resources marked with `~` will be modified
+- The plan summary shows how many resources will be added, changed, or destroyed
 
-### 3.5 Apply Your Changes
+### 4. Apply
+
+Now let's actually create the infrastructure:
 
 ```bash
 terraform apply
 ```
 
 **What this does:**
-- Actually creates the resources in AWS
-- Will show the plan again and ask for confirmation
-- Type `yes` to proceed
+- Shows the execution plan (same as `terraform plan`)
+- Asks for confirmation before proceeding
+- Creates the resources in AWS
+- Updates the Terraform state file
 
-**Expected outcome:**
-- An EC2 instance will be created in your AWS account
-- You'll see output values (IP address, DNS name)
+**Expected process:**
+1. Terraform will display the plan
+2. You'll be prompted: "Do you want to perform these actions?"
+3. Type `yes` to confirm
+4. Terraform will create the resources and show the progress
+5. Upon completion, you'll see the output values (public IP, DNS name)
 
-### 3.6 Inspect Your State
+### 5. Show
+
+After applying, inspect your infrastructure:
 
 ```bash
 terraform show
 ```
 
 **What this does:**
-- Shows the current state of your infrastructure
-- Lists all resources and their properties
+- Displays the current state of all managed resources
+- Shows all resource attributes and their current values
+- Useful for understanding what was actually created
 
-## Step 4: Making Changes
+### 6. Destroy
 
-Try making a simple change to practice the workflow:
-
-1. **Edit the instance tag** in `main.tf`:
-   ```hcl
-   tags = {
-     Name = "My Updated EC2 instance"
-   }
-   ```
-
-2. **Plan the change:**
-   ```bash
-   terraform plan
-   ```
-   You should see the tag will be updated.
-
-3. **Apply the change:**
-   ```bash
-   terraform apply
-   ```
-
-## Step 5: Cleaning Up
-
-When you're done with the lab, it's important to clean up to avoid charges:
+When you're finished with the lab, clean up the resources:
 
 ```bash
 terraform destroy
 ```
 
 **What this does:**
-- Destroys all resources created by this Terraform configuration
-- Will show what will be destroyed and ask for confirmation
-- Type `yes` to proceed
+- Shows what resources will be destroyed
+- Asks for confirmation before proceeding
+- Removes all resources defined in your configuration
+- Updates the state file to reflect the destroyed resources
 
-**⚠️ Important:** Always run `terraform destroy` when finished with lab exercises!
+**⚠️ Important:** Always run `terraform destroy` when finished to avoid AWS charges!
 
-## Common Commands Summary
+
+## Summary
+
+Congratulations! You've successfully completed the Terraform basics tutorial. Here's what you've accomplished:
+
+✅ **Step 2 - Providers:** Understood how Terraform uses providers to interact with cloud services  
+✅ **Step 3 - Resources:** Learned how to define AWS resources using Terraform configuration  
+✅ **Step 4 - CLI Commands:** Mastered the essential Terraform workflow commands  
+
+
+### Key Terraform Commands You've Learned
 
 | Command | Purpose |
-|---------|---------|
-| `terraform init` | Initialize working directory |
+|---------|----------|
+| `terraform init` | Initialize working directory and download providers |
 | `terraform fmt` | Format configuration files |
-| `terraform validate` | Check configuration syntax |
-| `terraform plan` | Preview changes |
-| `terraform apply` | Create/update resources |
+| `terraform validate` | Validate configuration syntax |
+| `terraform plan` | Preview changes before applying |
+| `terraform apply` | Create/update infrastructure |
 | `terraform show` | Display current state |
-| `terraform destroy` | Delete all resources |
+| `terraform destroy` | Destroy all managed resources |
+
+### The Terraform Workflow
+
+1. **Write** configuration files (`.tf`)
+2. **Initialize** the working directory (`terraform init`)
+3. **Plan** changes (`terraform plan`)
+4. **Apply** changes (`terraform apply`)
+5. **Manage** and update as needed
+6. **Destroy** when finished (`terraform destroy`)
 
 ## Troubleshooting
 
-### AWS Credentials Issues
-If you get authentication errors:
-1. Check that `~/.aws/credentials` exists and contains your credentials
-2. Verify the profile name matches what's in `provider.tf`
-3. Make sure your AWS session hasn't expired
+### Common Issues and Solutions
 
-### Permission Issues
-If you get "Access Denied" errors:
-- Your AWS academic account might not have permissions for certain actions
-- Try a different AWS region if specified in your course materials
+**AWS Credentials Not Found:**
+```
+Error: No valid credential sources found for AWS Provider
+```
+- Check that `~/.aws/credentials` exists and contains your credentials
+- Verify the profile name matches what's in `provider.tf`
+- Ensure your AWS session hasn't expired
 
-### Resource Already Exists
-If resources already exist:
-- Someone else might be using the same names
-- Change the resource names in your configuration
-- Or import existing resources (advanced topic)
+**Provider Version Conflicts:**
+```
+Error: Inconsistent dependency lock file
+```
+- Run `terraform init -upgrade` to update providers
+- This typically happens when you change provider versions
 
-## What You've Learned
+**Permission Denied:**
+```
+Error: UnauthorizedOperation
+```
+- Your AWS account may lack necessary permissions
+- Contact your instructor or AWS administrator
+- Try a different AWS region if specified in course materials
 
-By completing this lab, you've learned:
-
-✅ How to configure Terraform providers  
-✅ How to define AWS resources in code  
-✅ The essential Terraform workflow commands  
-✅ How to plan, apply, and destroy infrastructure  
-✅ Basic troubleshooting techniques  
+**Resources Already Exist:**
+```
+Error: resource already exists
+```
+- Someone else might be using the same resource names
+- Change resource names in your configuration
+- Or use `terraform import` to manage existing resources
 
 ## Next Steps
 
-Now that you understand the basics:
-- Experiment with different instance types
-- Try adding more resources
-- Learn about Terraform modules
-- Explore more AWS resources
+Now that you understand Terraform basics, consider exploring:
+
+- **Terraform Modules:** Reusable infrastructure components
+- **Remote State:** Storing state files in cloud storage
+- **Terraform Cloud:** Collaboration and automation platform
+- **More AWS Resources:** RDS databases, load balancers, auto-scaling groups
+- **Multi-environment Deployments:** Using workspaces or separate configurations
 
 ## Additional Resources
 
-- [Terraform AWS Provider Documentation](https://registry.terraform.io/providers/hashicorp/aws/latest/docs)
-- [Terraform Language Documentation](https://www.terraform.io/language)
-- [AWS Free Tier](https://aws.amazon.com/free/)
+- [Terraform Documentation](https://www.terraform.io/docs)
+- [AWS Provider Documentation](https://registry.terraform.io/providers/hashicorp/aws/latest/docs)
+- [Terraform Registry](https://registry.terraform.io/) - Find providers and modules
+- [AWS Free Tier](https://aws.amazon.com/free/) - Understand cost implications
+
+---
+
+**Remember:** Infrastructure as Code is a powerful approach that brings software development best practices to infrastructure management. Keep practicing and experimenting to become proficient with Terraform!
+
 
 ---
 
