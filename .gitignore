@@ -1,3 +1,28 @@
+# macOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Icon file on custom folders
+Icon
+
+# Thumbnails
+._*
+
+# Spotlight and indexing
+.Spotlight-V100
+.Trashes
+
+# Files on mounted volumes
+.VolumeIcon.icns
+
+# macOS system folders
+__MACOSX/
+
+# Temporary files
+*.swp
+*.lock
+
 # Local .terraform directories
 .terraform/
 
