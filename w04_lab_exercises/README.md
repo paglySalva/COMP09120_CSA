@@ -16,9 +16,10 @@ This Terraform configuration sets up a Kubernetes cluster on AWS with one master
 Set your AWS Academy credentials as environment variables or in `~/.aws/credentials`:
 
 ```bash
-export AWS_ACCESS_KEY_ID="your-access-key"
-export AWS_SECRET_ACCESS_KEY="your-secret-key"
-export AWS_SESSION_TOKEN="your-session-token"
+[default]
+aws_access_key_id="your-access-key"
+aws_secret_access_key="your-secret-key"
+aws_session_token="your-session-token"
 ```
 
 **Important**: AWS Academy session tokens expire every few hours. You'll need to update these credentials from your AWS Academy lab when they expire.
