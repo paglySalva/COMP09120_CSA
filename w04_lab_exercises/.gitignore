@@ -1,0 +1,60 @@
+# Terraform files
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+*.tfplan
+*.tfplan.*
+crash.log
+crash.*.log
+*.tfvars.backup
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# SSH keys and certificates
+*.pem
+*.key
+id_rsa*
+labsuser.pem
+
+# AWS credentials
+.aws/
+aws-credentials.txt
+
+# Local environment files
+.env
+.env.local
+.env.*.local
+*.env
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# Backup files
+*.bak
+*.backup
+
+# Archive files (that students might create)
+*.zip
+*.tar.gz
+*.tar
+*.rar
+
+# Documentation generated files
+*.docx
